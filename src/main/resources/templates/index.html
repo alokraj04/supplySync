@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SupplySync — Inventory Intelligence</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<!-- Confirm Modal -->
+<div id="confirm-modal" class="modal-overlay hidden">
+    <div class="modal-box confirm-box">
+        <div class="confirm-icon">⚠️</div>
+        <h3 id="confirm-title">Are you sure?</h3>
+        <p id="confirm-message">This action cannot be undone.</p>
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="closeConfirmModal()">Cancel</button>
+            <button class="btn btn-danger" id="confirm-ok-btn">Delete</button>
+        </div>
+    </div>
+</div>
+
+<!-- Product Modal (Add / Edit) -->
+<div id="product-modal" class="modal-overlay hidden">
+    <div class="modal-box">
+        <div class="modal-header">
+            <h2 id="modal-title">Add Product</h2>
+            <button class="modal-close" onclick="closeProductModal()">✕</button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="product-id" />
+            <div class="form-grid">
+                <div class="form-group span-2">
+                    <label>Product Name *</label>
+                    <input type="text" id="field-name" placeholder="e.g. Wireless Keyboard" />
+                </div>
+                <div class="form-group">
+                    <label>Category *</label>
+                    <input type="text" id="field-category" placeholder="e.g. Electronics" />
+                </div>
+                <div class="form-group">
+                    <label>Price (₹) *</label>
+                    <input type="number" id="field-price" placeholder="0.00" min="0" step="0.01" />
+                </div>
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="field-quantity" placeholder="0" min="0" />
+                </div>
+                <div class="form-group span-2">
+                    <label>Description</label>
+                    <textarea id="field-description" placeholder="Optional product description..." rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closeProductModal()">Cancel</button>
+            <button class="btn btn-primary" id="modal-save-btn" onclick="saveProduct()">Save Product</button>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Preview Modal -->
+<div id="preview-modal" class="modal-overlay hidden">
+    <div class="modal-box preview-box">
+        <div class="modal-header">
+            <h2>Product Details</h2>
+            <button class="modal-close" onclick="closePreviewModal()">✕</button>
+        </div>
+        <div id="preview-content" class="preview-content"></div>
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="closePreviewModal()">Close</button>
+            <button class="btn btn-primary" id="preview-edit-btn">Edit Product</button>
+        </div>
+    </div>
+</div>
+
+<!-- App Shell -->
+<div class="app-shell">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">⬡</div>
+            <div>
+                <div class="brand-name">SupplySync</div>
+                <div class="brand-sub">Inventory Intelligence</div>
+            </div>
+        </div>
+
+        <nav class="sidebar-nav">
+            <a href="#" class="nav-item active" data-section="dashboard" onclick="navigateTo('dashboard', this)">
+                <span class="nav-icon">◈</span> Dashboard
+            </a>
+            <a href="#" class="nav-item" data-section="products" onclick="navigateTo('products', this)">
+                <span class="nav-icon">◫</span> Products
+            </a>
+            <a href="#" class="nav-item" data-section="analytics" onclick="navigateTo('analytics', this)">
+                <span class="nav-icon">◉</span> Analytics
+            </a>
+            <a href="#" class="nav-item" data-section="activity" onclick="navigateTo('activity', this)">
+                <span class="nav-icon">◎</span> Activity
+            </a>
+        </nav>
+
+        <div class="sidebar-footer">
+            <div class="health-pill" id="health-pill">
+                <span class="health-dot"></span>
+                <span id="health-label">Loading...</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Area -->
+    <div class="main-area">
+
+        <!-- Top Navbar -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+                <div class="topbar-search">
+                    <span class="search-icon">⌕</span>
+                    <input type="text" id="global-search" placeholder="Search products... (Ctrl+K)" />
+                </div>
+            </div>
+            <div class="topbar-right">
+                <button class="icon-btn" onclick="exportToCSV()" title="Export CSV (Ctrl+E)">↓ Export</button>
+                <button class="icon-btn theme-toggle" onclick="toggleTheme()" id="theme-btn" title="Toggle theme">◑</button>
+                <div class="avatar">AR</div>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <main class="page-content">
+
+            <!-- ===== DASHBOARD SECTION ===== -->
+            <section id="section-dashboard" class="section active">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Dashboard</h1>
+                        <p class="section-sub">Real-time inventory overview</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+                </div>
+
+                <!-- Stat Cards -->
+                <div class="stat-grid">
+                    <div class="stat-card" style="--accent:#4ade80">
+                        <div class="stat-label">Total Products</div>
+                        <div class="stat-value" id="stat-total">—</div>
+                        <div class="stat-footer">All SKUs in system</div>
+                    </div>
+                    <div class="stat-card" style="--accent:#60a5fa">
+                        <div class="stat-label">Total Value</div>
+                        <div class="stat-value" id="stat-value">—</div>
+                        <div class="stat-footer">Inventory worth</div>
+                    </div>
+                    <div class="stat-card" style="--accent:#f59e0b">
+                        <div class="stat-label">Low Stock Items</div>
+                        <div class="stat-value" id="stat-low">—</div>
+                        <div class="stat-footer">Below threshold (≤10)</div>
+                    </div>
+                    <div class="stat-card" style="--accent:#f87171">
+                        <div class="stat-label">Out of Stock</div>
+                        <div class="stat-value" id="stat-oos">—</div>
+                        <div class="stat-footer">Qty = 0</div>
+                    </div>
+                </div>
+
+                <!-- Health Score + Summary -->
+                <div class="two-col">
+                    <div class="card health-card">
+                        <div class="card-label">Inventory Health Score</div>
+                        <div class="health-ring-wrap">
+                            <svg class="health-ring" viewBox="0 0 120 120">
+                                <circle class="ring-bg" cx="60" cy="60" r="52" />
+                                <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52" />
+                            </svg>
+                            <div class="health-center">
+                                <div class="health-score" id="health-score">—</div>
+                                <div class="health-lbl">/ 100</div>
+                            </div>
+                        </div>
+                        <div class="health-status" id="health-status">Calculating...</div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-label">Category Breakdown</div>
+                        <div id="category-breakdown" class="category-breakdown"></div>
+                    </div>
+                </div>
+
+                <!-- Recent Products Table (mini) -->
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-label">Recent Products</span>
+                        <a href="#" onclick="navigateTo('products', null)" class="view-all-link">View all →</a>
+                    </div>
+                    <div id="mini-table-wrap">
+                        <div class="skeleton-rows"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== PRODUCTS SECTION ===== -->
+            <section id="section-products" class="section">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Products</h1>
+                        <p class="section-sub">Manage your entire inventory</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="filter-bar">
+                    <input type="text" id="search-input" placeholder="Search by name..." class="filter-input" />
+                    <input type="text" id="category-input" placeholder="Filter by category..." class="filter-input" />
+                    <select id="sort-select" class="filter-select">
+                        <option value="">Sort by...</option>
+                        <option value="name-asc">Name A→Z</option>
+                        <option value="name-desc">Name Z→A</option>
+                        <option value="price-asc">Price Low→High</option>
+                        <option value="price-desc">Price High→Low</option>
+                        <option value="qty-asc">Qty Low→High</option>
+                        <option value="qty-desc">Qty High→Low</option>
+                    </select>
+                    <select id="stock-filter" class="filter-select">
+                        <option value="all">All Stock</option>
+                        <option value="in">In Stock</option>
+                        <option value="low">Low Stock</option>
+                        <option value="out">Out of Stock</option>
+                    </select>
+                    <button class="btn btn-ghost" onclick="clearFilters()">✕ Clear</button>
+                </div>
+
+                <!-- Table -->
+                <div class="card table-card">
+                    <div class="table-wrap">
+                        <table class="product-table" id="product-table">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                                <th>Stock</th>
+                                <th>Actions</th>
+                            </tr>
+                            </thead>
+                            <tbody id="product-tbody">
+                            <tr><td colspan="7" class="loading-cell">Loading products...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <!-- Pagination -->
+                    <div class="pagination" id="pagination"></div>
+                    <div class="table-footer" id="table-footer"></div>
+                </div>
+            </section>
+
+            <!-- ===== ANALYTICS SECTION ===== -->
+            <section id="section-analytics" class="section">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Analytics</h1>
+                        <p class="section-sub">Inventory insights and trends</p>
+                    </div>
+                </div>
+                <div class="charts-grid">
+                    <div class="card chart-card">
+                        <div class="card-label">Category Distribution</div>
+                        <canvas id="chart-category"></canvas>
+                    </div>
+                    <div class="card chart-card">
+                        <div class="card-label">Stock by Category</div>
+                        <canvas id="chart-stock"></canvas>
+                    </div>
+                    <div class="card chart-card span-2">
+                        <div class="card-label">Low Stock Risk Overview</div>
+                        <canvas id="chart-risk"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ===== ACTIVITY SECTION ===== -->
+            <section id="section-activity" class="section">
+                <div class="section-header">
+                    <div>
+                        <h1 class="section-title">Activity Feed</h1>
+                        <p class="section-sub">Recent inventory operations</p>
+                    </div>
+                    <button class="btn btn-ghost" onclick="clearActivity()">Clear All</button>
+                </div>
+                <div class="card">
+                    <div id="activity-feed" class="activity-feed">
+                        <div class="empty-state">No activity yet. Start by adding or modifying products.</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+</div>
+
+<!-- Keyboard shortcut hint -->
+<div class="shortcut-hint" id="shortcut-hint">
+    <strong>Ctrl+K</strong> Search &nbsp;|&nbsp; <strong>Ctrl+N</strong> New Product &nbsp;|&nbsp; <strong>Ctrl+E</strong> Export
+</div>
+
+<script src="/js/app.js"></script>
+</body>
+</html>
